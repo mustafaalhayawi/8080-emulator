@@ -5,4 +5,4 @@ project(8080_emulator)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
-add_executable(emulator main.cpp disassembler.cpp)
+add_executable(emulator main.cpp disassembler.cpp cpu.cpp)

@@ -13,7 +13,6 @@ std::string int_to_hex(const T val) {
     return stream.str();
 }
 
-
 void disassemble_8080_op(const std::vector<uint8_t>& inst, uint16_t& pc);
 
 void disassemble_file(const std::string& filename);
