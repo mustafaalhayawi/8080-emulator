@@ -1214,4 +1214,6 @@ void disassemble_file(const std::string& file_name) {
         uint16_t cur_pc = pc;
         disassemble_8080_op(memory, pc);
     }
+
+    delete[] memory;
 }
