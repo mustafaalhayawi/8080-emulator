@@ -2,7 +2,7 @@
 #include <iostream>
 #include <fstream>
 
-void disassemble_8080_op(const std::vector<uint8_t>& memory, uint16_t& pc) {
+void disassemble_8080_op(uint8_t* memory, uint16_t& pc) {
     std::string mnemonic = "", comment = "";
     uint16_t cur_pc = pc;
 
@@ -1203,16 +1203,14 @@ void disassemble_8080_op(const std::vector<uint8_t>& memory, uint16_t& pc) {
     std::cout << int_to_hex<uint16_t>(cur_pc + 0x0100) << ":\t" << mnemonic << ((comment == "") ? "" : ("\t; " + comment)) << "\n";
 }
 
-void disassemble_file(const std::string& filename) {
-    std::vector<uint8_t> memory;
-    std::ifstream infile;
-    infile.open(filename, std::ios::binary | std::ios::in);
-    infile.seekg(0, std::ios::end);
-    int filesize = infile.tellg();
-    memory.resize(filesize);
-    infile.seekg(0);
-    infile.read(reinterpret_cast<char*>(memory.data()), filesize);
-    for (uint16_t pc=0; pc<memory.size(); ) {
+void disassemble_file(const std::string& file_name) {
+    int file_size = get_file_size(file_name);
+
+    uint8_t* memory = new uint8_t[file_size]();
+
+    load_rom(file_name, memory, file_size);
+
+    for (uint16_t pc=0; pc<file_size; ) {
         uint16_t cur_pc = pc;
         disassemble_8080_op(memory, pc);
     }

@@ -1,6 +1,8 @@
 #pragma once
 
+#include "file.h"
 #include <cstdint>
+#include <fstream>
 
 enum ConditionFlags {
     FLAG_CY = 1 << 0, // carry - 0x01
@@ -8,10 +10,9 @@ enum ConditionFlags {
     FLAG_P = 1 << 2, // parity - 0x04
     // skip bit 3
     FLAG_AC = 1 << 4, // auxiliary carry - 0x10
-    // skipt bit 5
+    // skip bit 5
     FLAG_Z = 1 << 6, // zero - 0x40
     FLAG_S = 1 << 7 // sign - 0x80
-
 };
 
 struct State {
