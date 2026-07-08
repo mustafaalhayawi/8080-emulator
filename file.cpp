@@ -17,6 +17,6 @@ bool load_rom(const std::string& file_name, uint8_t* memory, int file_size) {
     infile.read(reinterpret_cast<char*>(memory), file_size);
     infile.close();
 
-    return file_size <= 0;
+    return file_size > 0;
 }
 

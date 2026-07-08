@@ -8,20 +8,40 @@ int main() {
 
     state.memory = new uint8_t[65536]();
 
-    // load_rom("8080PRE.COM", state.memory);
+    disassemble_file("8080PRE.COM");
     
-    // test rom
-    state.memory[0] = 0x3e; // MVI A, 0x42
-    state.memory[1] = 0x42;
-    state.memory[2] = 0x47; // MOV B, A
-    state.memory[3] = 0x04; // INR B 
-    state.memory[4] = 0xC3; // JMP 0x0004
-    state.memory[5] = 0x04;
-    state.memory[6] = 0x00;
+    load_rom("8080PRE.COM", state.memory + 0x0100);
+    state.pc = 0x0100;
+    state.sp = 0xFFFF;
 
+    bool trace = false;
     while (true) {
-        step_cpu(state);
-        std::cout << int_to_hex(state.a) << " " << int_to_hex(state.b) << "\n";
+        if (state.pc == 0x0689) {
+            trace = true;
+            uint16_t err_addr = (state.memory[state.sp+1] << 8) | state.memory[state.sp];
+            std::cout << "\nFatal error at address: " << int_to_hex(err_addr) << "\n";
+        }
+
+        if (state.pc == 0x0000) {
+            break;
+        } else if (state.pc == 0x0005) {
+            if (state.c == 0x09) {
+                char out_char = state.memory[state.de];
+                int i = 0;
+                while (out_char != '$') {
+                    std::cout << (char)out_char << std::flush;
+                    i++;
+                    out_char = state.memory[state.de+i];
+                }
+            } else if (state.c == 0x02){
+                std::cout << (char)state.e << std::flush;
+            }
+            state.pc = (state.memory[state.sp+1] << 8) | (state.memory[state.sp]);
+            state.sp += 2;
+        } else {
+            step_cpu(state);
+        }
+        if (trace) std::cout << "pc: " << int_to_hex(state.pc) << "\n";
     }
 
     delete[] state.memory;
