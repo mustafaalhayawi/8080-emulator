@@ -16,10 +16,10 @@ void inst_add(State& state, uint8_t val, bool carry) {
     uint16_t result = state.a + val + (carry ? get_flag(state, Flag::CY) : 0);
 
     set_flag(state, Flag::Z, (result & 0xFF) == 0);
-    set_flag(state, Flag::S, result & 0x80);
+    set_flag(state, Flag::S, (result & 0x80) != 0);
     set_flag(state, Flag::P, parity(get_low_byte(result)));
     set_flag(state, Flag::CY, result > get_low_byte(result));
-    set_flag(state, Flag::AC, ((state.a & 0x0F) + (val & 0x0F)) + (carry ? get_flag(state, Flag::CY) : 0) > 0x0F);
+    set_flag(state, Flag::AC, ((state.a ^ val ^ result) & 0x10) != 0);
 
     state.a = get_low_byte(result);
 }
@@ -28,10 +28,10 @@ void inst_sub(State& state, uint8_t val, bool carry) {
     uint16_t result = state.a - val - (carry ? get_flag(state, Flag::CY) : 0);
 
     set_flag(state, Flag::Z, (result & 0xFF) == 0);
-    set_flag(state, Flag::S, result & 0x80);
+    set_flag(state, Flag::S, (result & 0x80) != 0);
     set_flag(state, Flag::P, parity(get_low_byte(result)));
     set_flag(state, Flag::CY, state.a < (val + (carry ? get_flag(state, Flag::CY) : 0)));
-    set_flag(state, Flag::AC, ((state.a & 0x0F) - (val & 0x0F)) - (carry ? get_flag(state, Flag::CY) : 0) < 0x00);
+    set_flag(state, Flag::AC, ((state.a ^ ~val ^ result) & 0x10) != 0);
 
     state.a = get_low_byte(result);
 }
@@ -40,9 +40,9 @@ void inst_inr(State& state, uint8_t& num) {
     uint16_t result = num + 1;
 
     set_flag(state, Flag::Z, (result & 0xFF) == 0);
-    set_flag(state, Flag::S, result & 0x80);
+    set_flag(state, Flag::S, (result & 0x80) != 0);
     set_flag(state, Flag::P, parity(get_low_byte(result)));
-    set_flag(state, Flag::AC, ((num & 0x0F) + 0x01) > 0x0F);
+    set_flag(state, Flag::AC, ((num ^ 1 ^ result) & 0x10) != 0);
 
     num = get_low_byte(result);
 }
@@ -51,51 +51,52 @@ void inst_dcr(State& state, uint8_t& num) {
     uint16_t result = num - 1;
 
     set_flag(state, Flag::Z, (result & 0xFF) == 0);
-    set_flag(state, Flag::S, result & 0x80);
+    set_flag(state, Flag::S, (result & 0x80) != 0);
     set_flag(state, Flag::P, parity(get_low_byte(result)));
-    set_flag(state, Flag::AC, ((num & 0x0F) - 1) < 0x00);
+    set_flag(state, Flag::AC, ((num ^ 0xFE ^ result) & 0x10) != 0);
 
     num = get_low_byte(result);
 }
 
 void inst_dad(State& state, uint16_t rp) {
     uint32_t result = state.hl + rp;
-
     set_flag(state, Flag::CY, result > static_cast<uint16_t>(result));
-
     state.hl = static_cast<uint16_t>(result);
 }
 
 void inst_daa(State& state) {
-    uint8_t old_a = state.a;
-    bool old_cy = get_flag(state, Flag::CY);
-    bool new_cy = false;
+    uint8_t add = 0;
+    bool cy = get_flag(state, Flag::CY);
+    bool ac = get_flag(state, Flag::AC);
 
-    if ((state.a & 0x0F) > 0x09 || get_flag(state, Flag::AC)) {
-        state.a += 0x06;
-        if (state.a < 0x06) set_flag(state, Flag::AC, 1);
-        else set_flag(state, Flag::AC, 0);
+    if ((state.a & 0x0F) > 0x09 || ac) {
+        add += 0x06;
     }
 
-    if ((state.a & 0xF0) > 0x90 || old_cy || (state.a & 0xF0) > 0x90) {
-        state.a += 0x60;
-        new_cy = 1;
+    if ((state.a >> 4) > 0x09 || cy || ((state.a >> 4) >= 0x09 && (state.a & 0x0F) > 0x09)) {
+        add += 0x60;
+        cy = true;
     }
 
-    set_flag(state, Flag::Z, state.a == 0);
-    set_flag(state, Flag::S, state.a & 0x80);
-    set_flag(state, Flag::P, parity(state.a));
-    set_flag(state, Flag::CY, old_cy || new_cy);
+    uint16_t result = state.a + add;
+
+    set_flag(state, Flag::Z, get_low_byte(result) == 0);
+    set_flag(state, Flag::S, (result & 0x80) != 0);
+    set_flag(state, Flag::P, parity(get_low_byte(result)));
+    set_flag(state, Flag::CY, cy);
+    set_flag(state, Flag::AC, ((state.a ^ add ^ result) & 0x10) != 0);
+
+    state.a = get_low_byte(result);
 }
 
 void inst_and(State& state, uint8_t val, bool clear_ac) {
     uint8_t result = state.a & val;
 
     set_flag(state, Flag::Z, result == 0);
-    set_flag(state, Flag::S, result & 0x80);
+    set_flag(state, Flag::S, (result & 0x80) != 0);
     set_flag(state, Flag::P, parity(result));
     set_flag(state, Flag::CY, false);
-    set_flag(state, Flag::AC, ((state.a & 0x08) || (val & 0x08)) && !clear_ac);
+    set_flag(state, Flag::AC, ((state.a | val) & 0x08) != 0);
 
     state.a = result;
 }
@@ -104,7 +105,7 @@ void inst_xor(State& state, uint8_t val) {
     uint8_t result = state.a ^ val;
 
     set_flag(state, Flag::Z, result == 0);
-    set_flag(state, Flag::S, result & 0x80);
+    set_flag(state, Flag::S, (result & 0x80) != 0);
     set_flag(state, Flag::P, parity(result));
     set_flag(state, Flag::CY, false);
     set_flag(state, Flag::AC, false);
@@ -116,7 +117,7 @@ void inst_or(State& state, uint8_t val) {
     uint8_t result = state.a | val;
 
     set_flag(state, Flag::Z, result == 0);
-    set_flag(state, Flag::S, result & 0x80);
+    set_flag(state, Flag::S, (result & 0x80) != 0);
     set_flag(state, Flag::P, parity(result));
     set_flag(state, Flag::CY, false);
     set_flag(state, Flag::AC, false);
@@ -128,10 +129,10 @@ void inst_cmp(State& state, uint8_t val) {
     uint16_t result = state.a - val;
 
     set_flag(state, Flag::Z, state.a == val);
-    set_flag(state, Flag::S, result & 0x80);
-    set_flag(state, Flag::P, parity(result));
+    set_flag(state, Flag::S, (result & 0x80) != 0);
+    set_flag(state, Flag::P, parity(get_low_byte(result)));
     set_flag(state, Flag::CY, state.a < val);
-    set_flag(state, Flag::AC, ((state.a & 0x0F) - (val & 0x0F)) < 0x00);
+    set_flag(state, Flag::AC, ((state.a ^ ~val ^ result) & 0x10) != 0);
 }
 
 void inst_rlc(State& state) {
@@ -160,30 +161,42 @@ void inst_rar(State& state) {
     state.a = (state.a >> 1) | (cy_flag << 7);
 }
 
+void push_word(State& state, uint16_t val) {
+    state.sp--;
+    state.memory[state.sp] = get_high_byte(val);
+    state.sp--;
+    state.memory[state.sp] = get_low_byte(val);
+}
+
+uint16_t pop_word(State& state) {
+    uint8_t low = state.memory[state.sp];
+    state.sp++;
+    uint8_t high = state.memory[state.sp];
+    state.sp++;
+
+    return (high << 8) | low;
+}
+
 void inst_call(State& state, bool cond) {
     uint16_t addr = fetch_word(state);
 
     if (!cond) return;
 
-    state.memory[state.sp-1] = get_high_byte(state.pc);
-    state.memory[state.sp-2] = get_low_byte(state.pc);
-    state.sp -= 2;
+    push_word(state, state.pc);
     state.pc = addr;
 }
 
 void inst_ret(State& state, bool cond) {
     if (!cond) return;
 
-    state.pc = state.memory[state.sp] | (state.memory[state.sp+1] << 8);
-    state.sp += 2;
+    state.pc = pop_word(state);
 }
 
 void inst_rst(State& state, uint8_t n) {
-    state.memory[state.sp-1] = get_high_byte(state.pc);
-    state.memory[state.sp-2] = get_low_byte(state.pc);
-    state.sp -= 2;
+    push_word(state, state.pc);
     state.pc = n << 3;
 }
+
 
 bool parity(uint8_t val) {
     val ^= val >> 4;
@@ -628,6 +641,7 @@ void step_cpu(State& state) {
         case 0xDE:
             inst_sub(state, fetch_byte(state), true);
             break;
+        // INR r
         case 0x04:
             inst_inr(state, state.b);
             break;
@@ -649,7 +663,7 @@ void step_cpu(State& state) {
         case 0x3C:
             inst_inr(state, state.a);
             break;
-        // ICR M
+        // INR M
         case 0x34:
             inst_inr(state, state.memory[state.hl]);
             break;
@@ -959,6 +973,7 @@ void step_cpu(State& state) {
         case 0xC9:
         case 0xD9:
             inst_ret(state, true);
+            break;
         // Rcondition
         case 0xC0: // RNZ
             inst_ret(state, !get_flag(state, Flag::Z));
@@ -1015,48 +1030,37 @@ void step_cpu(State& state) {
             break;
         // PUSH rp
         case 0xC5:
-            state.memory[state.sp-1] = state.b;
-            state.memory[state.sp-2] = state.c;
-            state.sp -= 2;
+            push_word(state, state.bc);
             break;
         case 0xD5:
-            state.memory[state.sp-1] = state.d;
-            state.memory[state.sp-2] = state.e;
-            state.sp -= 2;
+            push_word(state, state.de);
             break;
         case 0xE5:
-            state.memory[state.sp-1] = state.h;
-            state.memory[state.sp-2] = state.l;
-            state.sp -= 2;
+            push_word(state, state.hl);
             break;
         // PUSH PSW
         case 0xF5:
-            state.memory[state.sp-1] = state.a;
-            state.memory[state.sp-2] = state.flags;
-            state.sp -= 2;
+            push_word(state, (state.a << 8) | state.flags);
             break;
         // POP rp
         case 0xC1:
-            state.c = state.memory[state.sp];
-            state.b = state.memory[state.sp+1];
-            state.sp += 2;
+            state.bc = pop_word(state);
             break;
         case 0xD1:
-            state.e = state.memory[state.sp];
-            state.d = state.memory[state.sp+1];
-            state.sp += 2;
+            state.de = pop_word(state);
             break;
         case 0xE1:
-            state.l = state.memory[state.sp];
-            state.h = state.memory[state.sp+1];
-            state.sp += 2;
+            state.hl = pop_word(state);
             break;
         // POP PSW
-        case 0xF1:
-            state.flags = state.memory[state.sp];
-            state.a = state.memory[state.sp+1];
-            state.sp += 2;
+        case 0xF1: {
+            uint16_t psw = pop_word(state);
+            state.flags = get_low_byte(psw);
+            state.flags |= 0x02;
+            state.flags &= ~0x28;
+            state.a = get_high_byte(psw);
             break;
+        }
         // XTHL
         case 0xE3:
             std::swap(state.l, state.memory[state.sp]);
@@ -1076,11 +1080,11 @@ void step_cpu(State& state) {
             break;
         // EI
         case 0xFB:
-            std::cout << "EI (0xFB) not implemented\n";
+            //std::cout << "EI (0xFB) not implemented\n";
             break;
         // DI
         case 0xF3:
-            std::cout << "DI (0xF3) not implemented\n";
+            //std::cout << "DI (0xF3) not implemented\n";
             break;
         // HLT
         case 0x76:

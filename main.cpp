@@ -8,9 +8,9 @@ int main() {
 
     state.memory = new uint8_t[65536]();
 
-    disassemble_file("8080PRE.COM");
-    
-    load_rom("8080PRE.COM", state.memory + 0x0100);
+    //disassemble_file("8080EXM.COM");
+
+    load_rom("8080EXM.COM", state.memory + 0x0100);
     state.pc = 0x0100;
     state.sp = 0xFFFF;
 
@@ -26,12 +26,10 @@ int main() {
             break;
         } else if (state.pc == 0x0005) {
             if (state.c == 0x09) {
-                char out_char = state.memory[state.de];
-                int i = 0;
-                while (out_char != '$') {
-                    std::cout << (char)out_char << std::flush;
-                    i++;
-                    out_char = state.memory[state.de+i];
+                uint16_t ptr = state.de;
+                while (ptr < 0x10000 && state.memory[ptr] != '$') {
+                    std::cout << (char)state.memory[ptr] << std::flush;
+                    ptr++;
                 }
             } else if (state.c == 0x02){
                 std::cout << (char)state.e << std::flush;
@@ -41,7 +39,11 @@ int main() {
         } else {
             step_cpu(state);
         }
-        if (trace) std::cout << "pc: " << int_to_hex(state.pc) << "\n";
+        if (trace) {
+            std::cout << "opcode: " << int_to_hex(state.memory[state.pc]) << "\n";
+            std::cout << "pc: " << int_to_hex(state.pc) << "\n";
+            std::cout << "sp: " << int_to_hex(state.sp) << "\n\n";
+        }
     }
 
     delete[] state.memory;

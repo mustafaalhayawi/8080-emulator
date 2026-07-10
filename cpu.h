@@ -7,11 +7,11 @@
 
 enum Flag {
     CY = 1 << 0, // carry - 0x01
-    // skip bit 1
+    // 1
     P = 1 << 2, // parity - 0x04
-    // skip bit 3
+    // 0 
     AC = 1 << 4, // auxiliary carry - 0x10
-    // skip bit 5
+    // 0
     Z = 1 << 6, // zero - 0x40
     S = 1 << 7 // sign - 0x80
 };
@@ -53,6 +53,7 @@ struct State {
 };
 
 void set_flag(State& state, Flag flag, bool cond);
+bool get_flag(State& state, Flag flag);
 
 void inst_add(State& state, uint8_t val, bool carry=false);
 void inst_sub(State& state, uint8_t val, bool carry=false);
