@@ -1,6 +1,7 @@
 #pragma once
 
 #include "file.h"
+#include "bus.h"
 #include <cstdint>
 #include <fstream>
 #include <iostream> // temp
@@ -46,6 +47,8 @@ struct State {
             uint8_t h = 0x00;
         };
     };
+
+    Bus bus;
 
     // ALU
     uint8_t a = 0x00; // accumulator

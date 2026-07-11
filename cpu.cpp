@@ -1071,13 +1071,17 @@ void step_cpu(State& state) {
             state.sp = state.hl;
             break;
         // IN port
-        case 0xDB:
-            std::cout << "IN (0xDB) not implemented\n";
+        case 0xDB: {
+            uint8_t port = fetch_byte(state);
+            state.a = state.bus.ports[port]->read();
             break;
+        }
         // OUT port
-        case 0xD3:
-            std::cout << "OUT (0xD3) not implemented\n";
+        case 0xD3: {
+            uint8_t port = fetch_byte(state);
+            state.bus.ports[port]->write(state.a);
             break;
+        }
         // EI
         case 0xFB:
             //std::cout << "EI (0xFB) not implemented\n";
