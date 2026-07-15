@@ -1,6 +1,7 @@
 #include "disassembler.h"
 #include "cpu.h"
 #include "file.h"
+#include "graphics.h"
 #include <iostream>
 #include <chrono>
 #include <thread>
@@ -8,7 +9,7 @@
 int main() {
     State state;
 
-    state.memory = new uint8_t[65536]();
+    /*state.memory = new uint8_t[65536]();
 
     //disassemble_file("8080EXM.COM");
 
@@ -65,8 +66,21 @@ int main() {
         }
     }
 
-    delete[] state.memory;
+    delete[] state.memory;*/
 
-    return 0;
+    int exit_code{ 0 };
+
+    Renderer renderer;
+
+    if (renderer.init() == false) {
+        SDL_Log("Unable to initalise program!\n");
+        exit_code = 1;
+    } else {
+        renderer.render();
+    }
+
+    renderer.close();
+
+    return exit_code;
 }
 

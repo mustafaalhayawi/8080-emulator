@@ -13,3 +13,5 @@ emulator
 
 .vscode/
 .vs/
+
+vendored/
