@@ -184,19 +184,20 @@ void inst_call(State& state, bool cond) {
 
     push_word(state, state.pc);
     state.pc = addr;
+    state.total_states += 6;
 }
 
 void inst_ret(State& state, bool cond) {
     if (!cond) return;
 
     state.pc = pop_word(state);
+    state.total_states += 5;
 }
 
 void inst_rst(State& state, uint8_t n) {
     push_word(state, state.pc);
     state.pc = n << 3;
 }
-
 
 bool parity(uint8_t val) {
     val ^= val >> 4;
@@ -230,9 +231,29 @@ uint16_t fetch_word(State& state) {
     return word;
 }
 
+const uint8_t OP_STATES[256] = {
+    4, 10, 7, 5, 5, 5, 7, 4, 4, 10, 7, 5, 5, 5, 7, 4, // 0x00 - 0x0F
+    4, 10, 7, 5, 5, 5, 7, 4, 4, 10, 7, 5, 5, 5, 7, 4, // 0x10 - 0x1F
+    4, 10, 16, 5, 5, 5, 7, 4, 4, 10, 16, 5, 5, 5, 7, 4, // 0x20 - 0x2F
+    4, 10, 13, 5, 10, 10, 10, 4, 4, 10, 13, 5, 5, 5, 7, 4, // 0x30 - 0x3F
+    5, 5, 5, 5, 5, 5, 7, 5, 5, 5, 5, 5, 5, 5, 7, 5, // 0x40 - 0x4F
+    5, 5, 5, 5, 5, 5, 7, 5, 5, 5, 5, 5, 5, 5, 7, 5, // 0x50 - 0x5F
+    5, 5, 5, 5, 5, 5, 7, 5, 5, 5, 5, 5, 5, 5, 7, 5, // 0x60 - 0x6F
+    7, 7, 7, 7, 7, 7, 7, 7, 5, 5, 5, 5, 5, 5, 7, 5, // 0x70 - 0x7F
+    4, 4, 4, 4, 4, 4, 7, 4, 4, 4, 4, 4, 4, 4, 7, 4, // 0x80 - 0x8F
+    4, 4, 4, 4, 4, 4, 7, 4, 4, 4, 4, 4, 4, 4, 7, 4, // 0x90 - 0x9F
+    4, 4, 4, 4, 4, 4, 7, 4, 4, 4, 4, 4, 4, 4, 7, 4, // 0xA0 - 0xAF
+    4, 4, 4, 4, 4, 4, 7, 4, 4, 4, 4, 4, 4, 4, 7, 4, // 0xB0 - 0xBF
+    5, 10, 10, 10, 11, 11, 7, 11, 5, 5, 10, 10, 11, 11, 7, 11, // 0xC0 - 0xCF
+    5, 10, 10, 10, 11, 11, 7, 11, 5, 5, 10, 10, 11, 11, 7, 11, // 0xD0 - 0xDF
+    5, 10, 10, 18, 11, 11, 7, 11, 5, 5, 10, 4, 11, 11, 7, 11, // 0xE0 - 0xEF
+    5, 10, 10, 4, 11, 11, 7, 11, 5, 5, 10, 4, 11, 11, 7, 11 // 0xF0 - 0xFF
+};
+
 void step_cpu(State& state) {
     uint8_t opcode = fetch_byte(state);
-    //std::cout << state.pc << " " << int_to_hex(opcode) << "\n";
+
+    state.total_states += OP_STATES[opcode];
 
     switch (opcode) {
         // MOV r1, r2
@@ -977,27 +998,35 @@ void step_cpu(State& state) {
         // Rcondition
         case 0xC0: // RNZ
             inst_ret(state, !get_flag(state, Flag::Z));
+            state.total_states++;
             break;
         case 0xC8: // RZ
             inst_ret(state, get_flag(state, Flag::Z));
+            state.total_states++;
             break;
         case 0xD0: // RNC
             inst_ret(state, !get_flag(state, Flag::CY));
+            state.total_states++;
             break;
         case 0xD8: // RC
             inst_ret(state, get_flag(state, Flag::CY));
+            state.total_states++;
             break;
         case 0xE0: // RPO
             inst_ret(state, !get_flag(state, Flag::P));
+            state.total_states++;
             break;
         case 0xE8: // RPE
             inst_ret(state, get_flag(state, Flag::P));
+            state.total_states++;
             break;
         case 0xF0: // RP
             inst_ret(state, !get_flag(state, Flag::S));
+            state.total_states++;
             break;
         case 0xF8: // RM
             inst_ret(state, get_flag(state, Flag::S));
+            state.total_states++;
             break;
         // RST n
         case 0xC7:
@@ -1084,15 +1113,23 @@ void step_cpu(State& state) {
         }
         // EI
         case 0xFB:
-            //std::cout << "EI (0xFB) not implemented\n";
+            state.ei_delay = 2;
             break;
         // DI
         case 0xF3:
-            //std::cout << "DI (0xF3) not implemented\n";
+            state.int_enabled = false;
             break;
         // HLT
         case 0x76:
+            state.halted = true;
             break;
+    }
+
+    if (state.ei_delay > 0) {
+        state.ei_delay--;
+        if (state.ei_delay == 0) {
+            state.int_enabled = true;
+        }
     }
 }
 

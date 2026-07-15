@@ -2,6 +2,8 @@
 #include "cpu.h"
 #include "file.h"
 #include <iostream>
+#include <chrono>
+#include <thread>
 
 int main() {
     State state;
@@ -15,6 +17,10 @@ int main() {
     state.sp = 0xFFFF;
 
     bool trace = false;
+
+    bool throttle_enabled = true;
+    auto frame_start = std::chrono::high_resolution_clock::now();
+
     while (true) {
         if (state.pc == 0x0689) {
             trace = true;
@@ -39,10 +45,23 @@ int main() {
         } else {
             step_cpu(state);
         }
+
         if (trace) {
             std::cout << "opcode: " << int_to_hex(state.memory[state.pc]) << "\n";
             std::cout << "pc: " << int_to_hex(state.pc) << "\n";
-            std::cout << "sp: " << int_to_hex(state.sp) << "\n\n";
+            //std::cout << "sp: " << int_to_hex(state.sp) << "\n\n";
+        }
+
+        if (throttle_enabled && state.total_states >= 33333) {
+            auto frame_end = std::chrono::high_resolution_clock::now();
+            auto elapsed_time = std::chrono::duration_cast<std::chrono::microseconds>(frame_end - frame_start).count();
+
+            if (elapsed_time < 16667) {
+                std::this_thread::sleep_for(std::chrono::microseconds(16667 - elapsed_time));
+            }
+
+            state.total_states = 0;
+            frame_start = std::chrono::high_resolution_clock::now();
         }
     }
 

@@ -53,6 +53,11 @@ struct State {
     // ALU
     uint8_t a = 0x00; // accumulator
     uint8_t flags = 0x02;
+
+    bool int_enabled = false;
+    int ei_delay = 0;
+    bool halted = false;
+    int total_states = 0;
 };
 
 void set_flag(State& state, Flag flag, bool cond);
