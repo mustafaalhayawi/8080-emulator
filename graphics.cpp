@@ -1,6 +1,6 @@
 #include "graphics.h"
 
-bool Renderer::init() {
+bool Renderer::init(const Driver* driver, std::string window_name) {
     bool success{ true };
 
     if (SDL_Init(SDL_INIT_VIDEO) == false) {
@@ -8,7 +8,7 @@ bool Renderer::init() {
         success = false;
     }
     else {
-        if (gWindow = SDL_CreateWindow("8080 Emulator", screen_width, screen_height, 0); gWindow == nullptr) {
+        if (gWindow = SDL_CreateWindow(window_name.c_str(), driver->screen_width, driver->screen_height, 0); gWindow == nullptr) {
             SDL_Log("Window could not be created! SDL error: %s\n", SDL_GetError());
             success = false;
         } else {
