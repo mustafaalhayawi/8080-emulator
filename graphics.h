@@ -6,10 +6,10 @@
 class Renderer {
     private:
         SDL_Window* gWindow{ nullptr };
-        SDL_Surface* gScreenSurface{ nullptr };
+        SDL_Surface* gSurface{ nullptr };
     public:
         bool init(const Driver* driver, std::string window_name);
-        void update_frame(const uint8_t* memory);
+        void update_texture(const uint32_t* host_buffer);
         void render();
         void close();
 };

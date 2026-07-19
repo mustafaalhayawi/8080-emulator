@@ -12,35 +12,43 @@ bool Renderer::init(const Driver* driver, std::string window_name) {
             SDL_Log("Window could not be created! SDL error: %s\n", SDL_GetError());
             success = false;
         } else {
-            gScreenSurface = SDL_GetWindowSurface(gWindow);
+            gSurface = SDL_GetWindowSurface(gWindow);
         }
     }
 
     return success;
 }
 
-void Renderer::render() {
-    bool quit{ false };
+void Renderer::update_texture(const uint32_t* host_buffer) {
+    if (SDL_LockSurface(gSurface)) {
+        uint32_t* surface_pixels = (uint32_t*)gSurface->pixels;
+        const SDL_PixelFormatDetails* format_details = SDL_GetPixelFormatDetails(gSurface->format);
 
-    SDL_Event e;
-    SDL_zero( e );
+        int total_pixels = gSurface->w * gSurface->h;
 
-    while (quit == false) {
-        while (SDL_PollEvent(&e) == true) {
-            if (e.type == SDL_EVENT_QUIT) {
-                quit = true;
-            }
+        for (int i = 0; i < total_pixels; i++) {
+            uint32_t pixel = host_buffer[i];
+
+            surface_pixels[i] = SDL_MapRGBA(format_details,
+                                            NULL,
+                                            (uint8_t)(pixel & 0xFF),
+                                            (uint8_t)((pixel & 0xFF00) >> 8),
+                                            (uint8_t)((pixel & 0xFF0000) >> 16),
+                                            (uint8_t)((pixel & 0xFF000000) >> 24));
         }
 
-        SDL_FillSurfaceRect(gScreenSurface, nullptr, SDL_MapSurfaceRGB(gScreenSurface, 0xFF, 0xFF, 0xFF));
-        SDL_UpdateWindowSurface(gWindow);
+        SDL_UnlockSurface(gSurface);
     }
+}
+
+void Renderer::render() {
+    SDL_UpdateWindowSurface(gWindow);
 }
 
 void Renderer::close() {
     SDL_DestroyWindow(gWindow);
     gWindow = nullptr;
-    gScreenSurface = nullptr;
+    gSurface = nullptr;
 
     SDL_Quit();
 }

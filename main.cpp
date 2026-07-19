@@ -13,8 +13,6 @@ int main(int argc, char* argv[]) {
     std::string window_name = "8080 Emulator";
     std::string file_name = "8080EXM.COM";
 
-    int exit_code{0};
-
     const Driver* driver = get_driver("cpm_terminal");
     for (int i=0; i<argc; i++) {
         if (std::string_view(argv[i]) == "--driver" && i + 1 < argc) {
@@ -27,39 +25,31 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    if (!driver->is_headless) {
-        Renderer renderer;
-        bool success = renderer.init(driver, window_name);
-
-        if (success == false) {
-            SDL_Log("Unable to initalise program!\n");
-            exit_code = 1;
-        } else {
-            renderer.render();
-        }
-
-        renderer.close();
-    }
-
     State state;
     state.memory = new uint8_t[65536]();
-
     load_rom("8080EXM.COM", state.memory + 0x0100);
     state.pc = 0x0100;
 
-    bool trace = false;
+    Renderer renderer;
+    std::vector<uint32_t> host_buffer;
+
+    if (!driver->is_headless) {
+        if (!renderer.init(driver, window_name)) {
+            SDL_Log("Unable to initalise program!\n");
+            delete[] state.memory;
+            return 1;
+        }
+
+        host_buffer.resize(driver->screen_width * driver->screen_height, 0);
+    }
+
 
     auto frame_start = std::chrono::high_resolution_clock::now();
+    bool running = true;
 
-    while (true) {
-        /*if (state.pc == 0x0609)
-            trace = true;
-            uint16_t err_addr = (state.memory[state.sp+1] << 8) | state.memory[state.sp];
-            std::cout << "\nFatal error at address: " << int_to_hex(err_addr) << "\n";
-        }*/
-
+    while (running) {
         if (state.pc == 0x0000) {
-            break;
+            running = false;
         } else if (state.pc == 0x005) {
             if (state.c == 0x09) {
                 uint16_t ptr = state.de;
@@ -76,27 +66,37 @@ int main(int argc, char* argv[]) {
             step_cpu(state);
         }
 
-        if (trace) {
-            std::cout << "pc: " << int_to_hex(state.pc) << "\n";
-            std::cout << "opcode: " << int_to_hex(state.memory[state.pc]) << "\n";
-            //std::cout << "sp: " << int_to_hex(state.sp) << "\n\n"; 
-        }
+        if (state.total_states >= 33333) {
+            if (!driver->is_headless && driver->translate_video != nullptr) {
+                SDL_Event e;
+                while (SDL_PollEvent(&e)) {
+                    if (e.type == SDL_EVENT_QUIT) {
+                        running = false;
+                    }
+                }
 
-        if (driver->is_throttled && state.total_states >= 33333) {
-            auto frame_end = std::chrono::high_resolution_clock::now();
-            auto elapsed_time = std::chrono::duration_cast<std::chrono::microseconds>(frame_end - frame_start).count();
+                driver->translate_video(state.memory, host_buffer.data());
 
-            if (elapsed_time < 16667) {
-                std::this_thread::sleep_for(std::chrono::microseconds(16667 - elapsed_time));
+                renderer.update_texture(host_buffer.data());
+                renderer.render();
             }
 
-            state.total_states = 0;
+            if (driver->is_throttled) {
+                auto frame_end = std::chrono::high_resolution_clock::now();
+                auto elapsed_time = std::chrono::duration_cast<std::chrono::microseconds>(frame_end - frame_start).count();
+
+                if (elapsed_time < 16667) {
+                    std::this_thread::sleep_for(std::chrono::microseconds(16667 - elapsed_time));
+                }
+            }
+
+            state.total_states -= 33333;
             frame_start = std::chrono::high_resolution_clock::now();
         }
     }
 
     delete[] state.memory;
 
-    return exit_code;
+    return 0;
 }
 
